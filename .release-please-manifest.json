@@ -1,0 +1,6 @@
+{
+  "packages/map-gesture-core": "1.0.0",
+  "packages/ol-gesture-controls": "1.0.0",
+  "packages/google-maps-gesture-controls": "1.0.0",
+  "packages/leaflet-gesture-controls": "1.0.0"
+}

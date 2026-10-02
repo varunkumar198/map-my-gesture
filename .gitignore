@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+examples/dist/
+docs/public/demo/
+
+# Vite
+*.local
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.idea/
+*.swp
+*.swo
+*~
+
+# Vite transpilation artifacts (contain machine-specific absolute paths)
+*.timestamp-*.mjs
+
+# VitePress cache (generated dependency pre-bundles)
+docs/.vitepress/cache/
+
+# Python
+__pycache__/
+*.pyc
+
+# AI generated files
+.cursor/
+.claude/

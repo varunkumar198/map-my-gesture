@@ -1,2 +1,294 @@
-# map-my-gesture
-Browser-native hand gesture controls for OpenLayers, Google Maps, and Leaflet. Pan and zoom maps with your webcam using MediaPipe. No backend required.
+# Map Gesture Controls: Hand Tracking for OpenLayers, Google Maps & Leaflet
+
+[![npm version](https://img.shields.io/npm/v/@map-gesture-controls/ol?style=flat-square)](https://www.npmjs.com/package/@map-gesture-controls/ol)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Bundle size](https://img.shields.io/bundlephobia/minzip/@map-gesture-controls/ol?style=flat-square&label=minzipped)](https://bundlephobia.com/package/@map-gesture-controls/ol)
+[![TypeScript](https://img.shields.io/badge/TypeScript-typed-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+
+**Control web maps with hand gestures using your webcam. No mouse, no touch, no backend.**
+
+Using [MediaPipe](https://developers.google.com/mediapipe) hand-tracking WASM running entirely in the browser, users can pan a map with the left hand, zoom with the right hand, and rotate with both hands. Each action can be triggered with either a **fist** or a **pinch** -- whichever feels more natural. This makes maps accessible in kiosk and exhibit environments, enables hands-free interaction for users with limited mobility, and opens up novel touchless UI experiences. Camera data never leaves the device.
+
+**Supports [OpenLayers](#openlayers) | [Google Maps](#google-maps) | [Leaflet](#leaflet)**
+
+**[Live demo and documentation](https://sanderdesnaijer.github.io/map-gesture-controls/)**
+
+<p align="center">
+  <img src="docs/public/openlayers-gesture-control-demo-v2.gif" alt="Screen recording of the map gesture demo: an OpenLayers map with a small webcam preview; the user pans with a fist and zooms with two open hands, all in the browser via MediaPipe." width="720" />
+</p>
+
+## How it works
+
+1. **Webcam capture**: `GestureController` opens the user's camera and feeds each frame to MediaPipe Hand Landmarker, which returns 21 3-D landmarks per detected hand.
+2. **Gesture classification**: `GestureStateMachine` classifies each frame using `classifyGesture()`: left fist or pinch = pan; right fist or pinch = zoom (vertical movement); both hands active = rotate; anything else = idle. A configurable dwell timer (`actionDwellMs`, default 80 ms) prevents flickering, and a grace period (`releaseGraceMs`, default 150 ms) smooths gesture releases.
+3. **OL integration**: `OpenLayersGestureInteraction` translates frame-over-frame hand deltas into `ol/Map` pan pixel offsets and zoom-level adjustments, applying dead-zone filtering and exponential smoothing before every update.
+
+## Packages
+
+| Package                                                                                                | npm                                                                                                                                                         | Description                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`@map-gesture-controls/core`](https://www.npmjs.com/package/@map-gesture-controls/core)               | [![npm](https://img.shields.io/npm/v/@map-gesture-controls/core?style=flat-square)](https://www.npmjs.com/package/@map-gesture-controls/core)               | Gesture detection engine, map-agnostic. Exports `GestureController`, `GestureStateMachine`, `WebcamOverlay`, `classifyGesture`, all types, constants, and utility functions. |
+| [`@map-gesture-controls/ol`](https://www.npmjs.com/package/@map-gesture-controls/ol)                   | [![npm](https://img.shields.io/npm/v/@map-gesture-controls/ol?style=flat-square)](https://www.npmjs.com/package/@map-gesture-controls/ol)                   | OpenLayers integration. Re-exports the full core API and adds `GestureMapController` and `OpenLayersGestureInteraction`.                                                     |
+| [`@map-gesture-controls/google-maps`](https://www.npmjs.com/package/@map-gesture-controls/google-maps) | [![npm](https://img.shields.io/npm/v/@map-gesture-controls/google-maps?style=flat-square)](https://www.npmjs.com/package/@map-gesture-controls/google-maps) | Google Maps integration. Re-exports the full core API and adds `GestureMapController` and `GoogleMapsGestureInteraction`.                                                    |
+| [`@map-gesture-controls/leaflet`](https://www.npmjs.com/package/@map-gesture-controls/leaflet)         | [![npm](https://img.shields.io/npm/v/@map-gesture-controls/leaflet?style=flat-square)](https://www.npmjs.com/package/@map-gesture-controls/leaflet)         | Leaflet integration. Re-exports the full core API and adds `GestureMapController` and `LeafletGestureInteraction`.                                                           |
+
+> Most users only need the `ol`, `google-maps`, or `leaflet` package. Each re-exports everything from core.
+
+## Requirements
+
+- A modern browser with WebGL and `getUserMedia` (webcam permission).
+- OpenLayers 10.x, Google Maps JavaScript API, **or** Leaflet 1.9.x.
+
+## Install
+
+**OpenLayers:**
+
+```bash
+npm install @map-gesture-controls/ol ol
+```
+
+**Google Maps:**
+
+```bash
+npm install @map-gesture-controls/google-maps @googlemaps/js-api-loader
+npm install -D @types/google.maps
+```
+
+**Leaflet:**
+
+```bash
+npm install @map-gesture-controls/leaflet leaflet
+npm install -D @types/leaflet
+```
+
+> **Publish flow (maintainers):** run `npm run build` so the `dist/` folder exists before `npm publish` (this repo does not commit `dist/`).
+
+## Usage
+
+### OpenLayers
+
+You need a container element in your HTML (e.g. `<div id="map"></div>`) and an [OpenLayers](https://openlayers.org/) `Map` instance:
+
+```ts
+import Map from 'ol/Map.js';
+import View from 'ol/View.js';
+import TileLayer from 'ol/layer/Tile.js';
+import OSM from 'ol/source/OSM.js';
+import { fromLonLat } from 'ol/proj.js';
+import { GestureMapController } from '@map-gesture-controls/ol';
+import '@map-gesture-controls/ol/style.css';
+
+const map = new Map({
+  target: 'map',
+  layers: [new TileLayer({ source: new OSM() })],
+  view: new View({ center: fromLonLat([0, 0]), zoom: 2 }),
+});
+
+const controller = new GestureMapController({ map });
+
+// Must be called from a user gesture (e.g. button click) for webcam permission
+await controller.start();
+
+controller.stop(); // tear down webcam and overlay
+```
+
+### Google Maps
+
+```ts
+import { Loader } from '@googlemaps/js-api-loader';
+import { GestureMapController } from '@map-gesture-controls/google-maps';
+import '@map-gesture-controls/google-maps/style.css';
+
+const loader = new Loader({ apiKey: 'YOUR_API_KEY', version: 'weekly' });
+const { Map } = await loader.importLibrary('maps');
+
+const map = new Map(document.getElementById('map')!, {
+  center: { lat: 0, lng: 0 },
+  zoom: 2,
+  mapId: 'YOUR_MAP_ID', // enables vector maps (required for rotation)
+});
+
+const controller = new GestureMapController({ map });
+
+await controller.start();
+
+controller.stop();
+```
+
+You need a Google Maps API key and a Map ID from the [Google Cloud Console](https://console.cloud.google.com/google/maps-apis). Create the Map ID with the **Vector** map type to enable rotation support. For local development, add both to a `.env` file:
+
+```
+VITE_GOOGLE_MAPS_API_KEY=your_api_key
+VITE_GOOGLE_MAPS_MAP_ID=your_map_id
+```
+
+See the [Google Maps Getting Started guide](https://sanderdesnaijer.github.io/map-gesture-controls/google-maps/getting-started) for full setup details.
+
+### Leaflet
+
+```ts
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { GestureMapController } from '@map-gesture-controls/leaflet';
+import '@map-gesture-controls/leaflet/style.css';
+
+const map = L.map('map').setView([52.37, 4.9], 10);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+}).addTo(map);
+
+const controller = new GestureMapController({ map });
+
+await controller.start();
+
+controller.stop();
+```
+
+No API key needed. Leaflet uses OpenStreetMap tiles by default. Rotation is supported via CSS transforms on the map pane.
+
+See the [Leaflet Getting Started guide](https://sanderdesnaijer.github.io/map-gesture-controls/leaflet/getting-started) for full setup details.
+
+Optional config: `webcam`, `tuning`, and `debug`. See the [Configuration](#configuration) section below.
+
+## Configuration
+
+All options are optional. Pass only the keys you want to override; the rest use sensible defaults.
+
+```ts
+// `map` is your ol/Map or google.maps.Map instance (see Usage above)
+const controller = new GestureMapController({
+  map,
+  webcam: {
+    position: 'top-left', // move overlay to top-left corner
+    width: 240, // narrower overlay
+    height: 180,
+    margin: 24, // 24 px from viewport edges
+    opacity: 0.7,
+  },
+  tuning: {
+    actionDwellMs: 40, // faster gesture confirmation
+    releaseGraceMs: 80, // shorter grace period
+    panDeadzonePx: 0, // direct panning for slow movement
+  },
+  debug: true, // log gesture mode to console
+});
+```
+
+### `webcam` options (`WebcamConfig`)
+
+| Key        | Type                                                           | Default          | Description                              |
+| ---------- | -------------------------------------------------------------- | ---------------- | ---------------------------------------- |
+| `enabled`  | `boolean`                                                      | `true`           | Show/hide the overlay entirely.          |
+| `mode`     | `'corner' \| 'full' \| 'hidden'`                               | `'corner'`       | Display mode.                            |
+| `position` | `'bottom-right' \| 'bottom-left' \| 'top-right' \| 'top-left'` | `'bottom-right'` | Corner when `mode === 'corner'`.         |
+| `width`    | `number`                                                       | `320`            | Overlay width in px (corner mode).       |
+| `height`   | `number`                                                       | `240`            | Overlay height in px (corner mode).      |
+| `margin`   | `number`                                                       | `16`             | Distance in px from the nearest edge(s). |
+| `opacity`  | `number`                                                       | `0.85`           | CSS opacity (0 to 1).                    |
+
+### `tuning` options (`TuningConfig`)
+
+| Key                      | Type     | Default | Description                                                                                                                                           |
+| ------------------------ | -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `actionDwellMs`          | `number` | `80`    | Hold time (ms) before a gesture is confirmed.                                                                                                         |
+| `releaseGraceMs`         | `number` | `150`   | Grace period (ms) before returning to idle after gesture ends.                                                                                        |
+| `panDeadzonePx`          | `number` | `0`     | Minimum pixel movement to register a pan.                                                                                                             |
+| `zoomDeadzoneRatio`      | `number` | `0.005` | Minimum distance-ratio change to register a zoom.                                                                                                     |
+| `rotateDeadzoneRad`      | `number` | `0.005` | Minimum wrist-to-wrist angle change (radians) to emit a rotate delta. Lower values respond to smaller wrist tilts; higher values filter micro jitter. |
+| `smoothingAlpha`         | `number` | `0.35`  | Exponential smoothing factor (0 = max smooth, 1 = raw).                                                                                               |
+| `minDetectionConfidence` | `number` | `0.65`  | MediaPipe minimum detection confidence.                                                                                                               |
+| `minTrackingConfidence`  | `number` | `0.65`  | MediaPipe minimum tracking confidence.                                                                                                                |
+| `minPresenceConfidence`  | `number` | `0.60`  | MediaPipe minimum presence confidence.                                                                                                                |
+
+## Development
+
+```bash
+npm install
+npm run dev
+```
+
+Runs the demo in `examples/` (Vite, port 5173 by default).
+
+### Environment variables
+
+To enable live hazard and weather map layers in the Tactical Ops Center demo (`demo-tactical.html`), copy `.env.example` to `.env` and provide your API keys:
+
+```bash
+cp .env.example .env
+```
+
+- `TOMORROW_API_KEY`: API key for Tomorrow.io weather map tiles (precipitation and flood risk layers). All tile requests are proxied securely server-side through `/api/tomorrow-tile/...` and the key is never exposed to the client.
+- `MAPPLS_API_KEY` / `VITE_MAPPLS_API_KEY`: Static API key for Mappls (MapmyIndia) Interactive Map basemap. Provides deep street-level coverage across India without missing tile gaps. Obtain from [Mappls Console](https://auth.mappls.com/console).
+- `GFW_USERNAME` / `GFW_PASSWORD`: Optional credentials for Global Forest Watch deforestation stats.
+- `VITE_CARTO_API_KEY`: Optional API key for CARTO Dark Matter basemap tiles.
+
+```bash
+npm run build
+```
+
+Produces the library in `dist/` (JS, declarations, bundled CSS).
+
+```bash
+npm run type-check
+```
+
+## Gestures
+
+Both **fist** and **pinch** (thumb and index finger touching) trigger the same actions, use whichever feels more comfortable.
+
+| Mode   | Condition                                           | Action                  | How to perform                                                                                                                  |
+| ------ | --------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Pan    | Left hand fist or pinch (right hand absent or open) | Move left hand          | Make a fist or pinch with the left hand, then move it in any direction to pan the map                                           |
+| Zoom   | Right hand fist or pinch (left hand absent or open) | Move right hand up/down | Make a fist or pinch with the right hand, then move it up to zoom in or down to zoom out                                        |
+| Rotate | Both hands fist or pinch                            | Tilt wrists             | Make a fist or pinch with both hands and tilt them clockwise or counter-clockwise to rotate the map                             |
+| Reset  | Both hands together (pray / namaste), hold 1 second | Resets view             | Bring your hands together with wrists close, hold the pose for 1 second: pan, zoom, and rotation return to their initial values |
+| Idle   | Any other hand position                             | None                    | Let your hands rest or hold any non-recognised pose; the map does nothing                                                       |
+
+Gestures are confirmed after a short dwell period (default 80 ms) to avoid accidental triggers, and released after a grace period (default 150 ms) to prevent flickering when hands briefly lose tracking.
+
+## Browser support
+
+| Browser         | Support      |
+| --------------- | ------------ |
+| Chrome 111+     | Full support |
+| Edge 111+       | Full support |
+| Firefox 115+    | Full support |
+| Safari 17+      | Full support |
+| Mobile browsers | Untested     |
+
+Requirements: **WebGL** (for OpenLayers rendering), **`getUserMedia`** (webcam access), and **WASM** (MediaPipe hand landmarker model, ~10 MB, loaded on first `start()` call).
+
+## Contributing
+
+- This project uses [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `chore:`, etc.)
+- PRs are welcome. Please open an [issue](https://github.com/sanderdesnaijer/map-gesture-controls/issues) first for significant changes
+- Run `npm run type-check` and ensure no TS errors before submitting
+
+## Documentation
+
+Full docs, live demos, and API reference at **[sanderdesnaijer.github.io/map-gesture-controls](https://sanderdesnaijer.github.io/map-gesture-controls/)**
+
+To build and preview the docs locally:
+
+```bash
+npm run docs:build
+npm run docs:preview
+```
+
+Built by [Sander de Snaijer](https://www.sanderdesnaijer.com).
+
+## Special Thanks
+
+Thanks to the following people for testing, feedback, and helping improve gesture controls:
+
+- [SupersonicSquirrel](https://www.reddit.com/user/SupersonicSquirrel/) (Reddit)
+- [ThePixelProYT](https://www.reddit.com/user/ThePixelProYT/) (Reddit)
+
+## License
+
+MIT
+
+## Privacy & network
+
+The library loads MediaPipe WASM and the hand landmarker model from public CDNs (see `src/constants.ts` and `src/GestureController.ts`). It does not send your video to a custom backend; processing runs locally in the browser after you grant camera access.

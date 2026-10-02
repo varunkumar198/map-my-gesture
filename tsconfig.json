@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "types": ["vite/client"],
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": ".",
+    "paths": {
+      "@map-gesture-controls/core": ["packages/map-gesture-core/src/index.ts"],
+      "@map-gesture-controls/ol": ["packages/ol-gesture-controls/src/index.ts"],
+      "@map-gesture-controls/google-maps": [
+        "packages/google-maps-gesture-controls/src/index.ts"
+      ],
+      "@map-gesture-controls/leaflet": [
+        "packages/leaflet-gesture-controls/src/index.ts"
+      ]
+    }
+  },
+  "include": ["examples", "packages/*/src"]
+}
